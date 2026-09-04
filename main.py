@@ -4,16 +4,32 @@ import os
 from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
+import logging
+from logging.handlers import RotatingFileHandler
 
 # --- Configuration ---
-if not os.path.isdir("Backups"):
-    os.makedirs("Backups")
+BACKUP_DIR_NAME = "Backups"
+if not os.path.isdir(BACKUP_DIR_NAME):
+    os.makedirs(BACKUP_DIR_NAME)
     
-BACKUP_DIR = Path("Backups") 
+BACKUP_DIR = Path(BACKUP_DIR_NAME) 
 # Prefix for the backup files
 BACKUP_PREFIX = "backup_"
 # Number of backups to keep
-MAX_BACKUPS = 12
+MAX_BACKUPS = 5
+
+# --- Logging Configuration ---
+LOG_FILE = "backup_utility.log"
+MAX_LOG_SIZE = 5 * 1024 * 1024 # 5 MB limit
+BACKUP_LOG_COUNT = 1 # Keep 1 old log file (backup_utility.log.1) when it rotates
+
+# Set up the rotating logger
+logger = logging.getLogger("BackupLogger")
+logger.setLevel(logging.INFO)
+handler = RotatingFileHandler(LOG_FILE, maxBytes=MAX_LOG_SIZE, backupCount=BACKUP_LOG_COUNT)
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 def show_error_popup(title, message):
     """Displays a GUI popup for errors."""
@@ -34,27 +50,32 @@ def run_backup():
         "pg_dump", "-U", "accounting", "-d", "accounting", "--clean"
     ]
     
-    print(f"Starting backup: {backup_filename}...")
+    logger.info(f"Starting backup: {backup_filename}...")
     
     try:
         # 3. Execute the command and write the output directly to the file
-        with open(backup_filename, "w") as backup_file:
-            subprocess.run(command, stdout=backup_file, check=True)
-        print("Backup completed successfully.")
+        # Added stderr=subprocess.PIPE to capture exact database errors for the logs/popups
+        with open(backup_filename, "w", encoding="utf-8") as backup_file:
+            result = subprocess.run(command, stdout=backup_file, stderr=subprocess.PIPE, text=True, check=True)
+        logger.info("Backup completed successfully.")
         
     except subprocess.CalledProcessError as e:
-        error_msg = f"Error during backup execution:\n{e}"
-        print(error_msg)
+        # Extract the specific error output from Docker/pg_dump
+        stderr_output = e.stderr.strip() if e.stderr else "No specific error output provided."
+        error_msg = f"Command failed with exit code {e.returncode}:\n{stderr_output}"
+        
+        logger.error(error_msg)
         show_error_popup("Backup Failed", error_msg)
         
         # If the backup failed, delete the empty/partial file
         if backup_filename.exists():
             backup_filename.unlink()
+            logger.info(f"Deleted partial/failed backup file: {backup_filename}")
         return
         
     except Exception as e:
         error_msg = f"An unexpected error occurred:\n{e}"
-        print(error_msg)
+        logger.error(error_msg)
         show_error_popup("Unexpected Error", error_msg)
         return
 
@@ -72,22 +93,23 @@ def cleanup_old_backups():
     # Check if we have more than the allowed maximum
     if len(backups) > MAX_BACKUPS:
         backups_to_delete = len(backups) - MAX_BACKUPS
-        print(f"Found {len(backups)} backups. Deleting the oldest {backups_to_delete}...")
+        logger.info(f"Found {len(backups)} backups. Deleting the oldest {backups_to_delete}...")
         
         # Delete the oldest files until we are down to MAX_BACKUPS
         while len(backups) > MAX_BACKUPS:
             oldest_backup = backups.pop(0) # Remove the first (oldest) from the list
             try:
                 oldest_backup.unlink()
-                print(f"Deleted old backup: {oldest_backup.name}")
+                logger.info(f"Deleted old backup: {oldest_backup.name}")
             except Exception as e:
                 error_msg = f"Failed to delete {oldest_backup.name}:\n{e}"
-                print(error_msg)
+                logger.error(error_msg)
                 show_error_popup("Cleanup Error", error_msg)
     else:
-        print(f"Total backups currently stored: {len(backups)} (Limit: {MAX_BACKUPS})")
+        logger.info(f"Total backups currently stored: {len(backups)} (Limit: {MAX_BACKUPS})")
 
 if __name__ == "__main__":
+    logger.info("--- Backup script triggered ---")
     # Ensure the backup directory exists
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     run_backup()
