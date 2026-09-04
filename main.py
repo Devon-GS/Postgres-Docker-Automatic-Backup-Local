@@ -4,8 +4,10 @@ import os
 from pathlib import Path
 
 # --- Configuration ---
-# Directory where backups will be saved ('.' means current directory)
-BACKUP_DIR = Path(".") 
+if not os.path.isdir("Backups"):
+    os.makedirs("Backups")
+    
+BACKUP_DIR = Path("Backups") 
 # Prefix for the backup files
 BACKUP_PREFIX = "backup_"
 # Number of backups to keep
