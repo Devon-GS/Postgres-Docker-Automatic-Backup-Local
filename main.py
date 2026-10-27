@@ -54,7 +54,7 @@ def run_backup():
     
     # 2. Define the Docker command
     command = [
-			"docker", "exec", "-i", DOCKER_CONTAINER_NAME,
+			"docker", "exec", DOCKER_CONTAINER_NAME,
 			"pg_dump", "-U", USERNAME, "-d", DATABASE_NAME, "--clean"
 		]
     
