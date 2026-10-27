@@ -54,9 +54,9 @@ def run_backup():
     
     # 2. Define the Docker command
     command = [
-        "docker", "exec", "-i", "sasol-accounting-db-primary",
-        "pg_dump", "-U", "accounting", "-d", "accounting", "--clean"
-    ]
+			"docker", "exec", "-i", DOCKER_CONTAINER_NAME,
+			"pg_dump", "-U", USERNAME, "-d", DATABASE_NAME, "--clean"
+		]
     
     logger.info(f"Starting backup: {backup_filename}...")
     
