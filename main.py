@@ -17,6 +17,11 @@ BACKUP_DIR = Path(BACKUP_DIR_NAME)
 BACKUP_PREFIX = "backup_"
 # Number of backups to keep
 MAX_BACKUPS = 5
+# Database setup information
+DOCKER_CONTAINER_NAME: str = "sasol-accounting-db-primary"
+USERNAME: str = "accounting"
+DATABASE_NAME: str = "accounting"
+# ---- Configuration End ---
 
 # --- Logging Configuration ---
 LOG_FILE = "backup_utility.log"
@@ -30,7 +35,9 @@ handler = RotatingFileHandler(LOG_FILE, maxBytes=MAX_LOG_SIZE, backupCount=BACKU
 formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 handler.setFormatter(formatter)
 logger.addHandler(handler)
+# --- Logging Configuration End ---
 
+# Dispaly error gui
 def show_error_popup(title, message):
     """Displays a GUI popup for errors."""
     root = tk.Tk()
@@ -39,6 +46,7 @@ def show_error_popup(title, message):
     messagebox.showerror(title, message)
     root.destroy()
 
+# Backup 
 def run_backup():
     # 1. Generate the filename with the current date (e.g., backup_2026-09-03.sql)
     current_date = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -82,6 +90,7 @@ def run_backup():
     # 4. Enforce the retention policy (Keep only 12 backups)
     cleanup_old_backups()
 
+# Clean up backups
 def cleanup_old_backups():
     # Find all files matching the backup prefix and extension
     search_pattern = f"{BACKUP_PREFIX}*.sql"
